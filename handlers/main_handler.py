@@ -575,7 +575,6 @@ async def run_meditation(callback: CallbackQuery):
         parse_mode="Markdown"
     )
 
-    # Генерируем текстовую медитацию
     response = await get_meditation(med_data['name'], med_data['mood'])
 
     await save_dialog(
@@ -585,17 +584,16 @@ async def run_meditation(callback: CallbackQuery):
         bot_response=response
     )
 
-    # Отправляем текст медитации
     await callback.message.edit_text(
         f"🧘 *{med_data['name']}*\n\n{safe_text(response)}",
         parse_mode="Markdown"
     )
 
-    # Отдельным сообщением — ссылка на YouTube
     await callback.message.answer(
-        f"🎧 *Хочешь погрузиться глубже?*\n\n"
-        f"{med_data['description']}\n\n"
-        f"👉 [Слушать медитацию на YouTube]({med_data['url']})",
+        "🎧 *Аудио медитации*\n\n"
+        "Скоро здесь появятся профессиональные аудио медитации — "
+        "можно будет слушать голосом прямо в Telegram 🌙\n\n"
+        "_Следи за обновлениями!_",
         parse_mode="Markdown",
         reply_markup=back_to_menu()
     )
