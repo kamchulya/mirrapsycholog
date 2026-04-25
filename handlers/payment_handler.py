@@ -17,7 +17,7 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-STARS_PRICE = 300  # 300 Telegram Stars ≈ ~3000₸
+STARS_PRICE = 680  # 680 Telegram Stars ≈ ~3000₸
 
 # ──────────────────────────────────────────────
 # КЛАВИАТУРА ОПЛАТЫ
