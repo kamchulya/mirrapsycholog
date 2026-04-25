@@ -186,19 +186,59 @@ async def cmd_give_access(message: Message):
 
     parts = message.text.split()
     if len(parts) < 2:
-        await message.answer("Использование: `/give_access 123456789`", parse_mode="Markdown")
+        await message.answer(
+            "Использование:\n"
+            "`/give_access @username` — по юзернейму\n"
+            "`/give_access 123456789` — по ID\n"
+            "`/give_access @username 60` — на 60 дней",
+            parse_mode="Markdown"
+        )
         return
 
-    try:
-        target_id = int(parts[1])
-        days = int(parts[2]) if len(parts) > 2 else 30
+    target = parts[1].replace("@", "")
+    days = int(parts[2]) if len(parts) > 2 else 30
 
+    try:
+        # Если число — это ID
+        if target.isdigit():
+            target_id = int(target)
+        else:
+            # Ищем по username в базе
+            pool = None
+            from models.database import _init_pool
+            import psycopg2.extras
+            p = _init_pool()
+            conn = p.getconn()
+            try:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT telegram_id, first_name FROM users WHERE LOWER(username) = LOWER(%s)",
+                        (target,)
+                    )
+                    user = cur.fetchone()
+            finally:
+                p.putconn(conn)
+
+            if not user:
+                await message.answer(
+                    f"❌ Пользователь @{target} не найден в базе.\n\n"
+                    f"Он должен сначала запустить бота (/start).",
+                    parse_mode="Markdown"
+                )
+                return
+
+            target_id = user["telegram_id"]
+            name = user.get("first_name", target)
+            await message.answer(f"✅ Нашла: {name} (ID: {target_id})")
+
+        # Даём доступ
+        from datetime import datetime, timedelta
+        from models.database import update_user
         until = (datetime.now() + timedelta(days=days)).isoformat()
         await update_user(target_id, is_subscribed=1, subscription_until=until)
 
         # Уведомляем пользователя
         try:
-            from aiogram.utils.keyboard import InlineKeyboardBuilder
             from utils.keyboards import main_menu
             await message.bot.send_message(
                 chat_id=target_id,
@@ -209,16 +249,16 @@ async def cmd_give_access(message: Message):
                 reply_markup=main_menu()
             )
         except Exception as e:
-            logger.warning(f"Не удалось уведомить пользователя {target_id}: {e}")
+            logger.warning(f"Не удалось уведомить {target_id}: {e}")
 
         await message.answer(
-            f"✅ Подписка выдана пользователю `{target_id}` на {days} дней\n"
+            f"✅ Подписка выдана на {days} дней\n"
             f"До: {until[:10]}",
             parse_mode="Markdown"
         )
 
     except ValueError:
-        await message.answer("❌ Неверный формат. Используй: `/give_access 123456789 30`", parse_mode="Markdown")
+        await message.answer("❌ Неверный формат. Используй @username или числовой ID")
 
 
 @router.message(Command("revoke_access"))
