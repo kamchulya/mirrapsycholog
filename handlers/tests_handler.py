@@ -154,6 +154,38 @@ def after_test_keyboard() -> InlineKeyboardBuilder:
 # ОТКРЫТИЕ МЕНЮ ТЕСТОВ
 # ──────────────────────────────────────────────
 
+@router.callback_query(F.data == "show_banknote")
+async def show_banknote(callback: CallbackQuery):
+    import os
+    from aiogram.types import FSInputFile
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    note_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "static", "20000.jpeg"
+    )
+    try:
+        if os.path.exists(note_path):
+            await callback.message.answer_photo(
+                photo=FSInputFile(note_path),
+                caption=(
+                    "💰 *20 000 тенге*\n\n"
+                    "Смотри на купюру внимательно *2-3 минуты*...\n"
+                    "Рассматривай каждую деталь.\n\n"
+                    "_Когда будешь готова — закрой глаза и представь что купюра превратилась в человека._"
+                ),
+                parse_mode="Markdown"
+            )
+        else:
+            await callback.message.answer("Файл купюры не найден 😔")
+    except Exception as e:
+        logger.error(f"Ошибка отправки купюры: {e}")
+        await callback.message.answer("Не удалось загрузить изображение 😔")
+
+    await callback.answer()
+
+
 @router.callback_query(F.data == "mode_tests")
 async def open_tests_menu(callback: CallbackQuery):
     await callback.message.edit_text(
@@ -191,6 +223,30 @@ async def start_test(callback: CallbackQuery):
         {"role": "system", "content": "step:0"},
         {"role": "system", "content": "answers:{}"}
     ])
+
+    if test_id == "money_avatar":
+        # Показываем первый экран с кнопкой посмотреть купюру
+        from aiogram.utils.keyboard import InlineKeyboardBuilder
+        from aiogram.types import InlineKeyboardButton
+        builder = InlineKeyboardBuilder()
+        builder.row(InlineKeyboardButton(
+            text="💰 Показать купюру 20 000 ₸",
+            callback_data="show_banknote"
+        ))
+        builder.row(InlineKeyboardButton(
+            text="◀️ Назад к тестам",
+            callback_data="mode_tests"
+        ))
+        await callback.message.edit_text(
+            f"*{test['name']}*\n\n"
+            f"_{test['desc']}_\n\n"
+            f"━━━━━━━━━━━━━━━━━\n\n"
+            f"{test['steps'][0][1]}",
+            parse_mode="Markdown",
+            reply_markup=builder.as_markup()
+        )
+        await callback.answer()
+        return
 
     first_step = test["steps"][0]
 
