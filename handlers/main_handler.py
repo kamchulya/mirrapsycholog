@@ -19,7 +19,7 @@ from services.ai_service import (
     generate_weekly_report, detect_emotion, generate_diary_summary,
     generate_session_summary
 )
-from services.pdf_service import generate_diary_pdf
+from services.voice_service import transcribe_voice, download_voice, cleanup_file
 from utils.keyboards import (
     main_menu, iching_intro, iching_confirm, mak_intro, mak_draw,
     mak_after_card, numerology_menu, numerology_other, meditation_menu,
@@ -746,8 +746,123 @@ async def generate_report(callback: CallbackQuery):
 # ТЕКСТОВЫЕ СООБЩЕНИЯ
 # ──────────────────────────────────────────────
 
-@router.message(F.text)
-async def handle_message(message: Message):
+@router.message(F.voice)
+async def handle_voice(message: Message):
+    """Обрабатываем голосовые сообщения через Whisper"""
+    user_id = message.from_user.id
+
+    # Проверяем доступ
+    can_use, reason = await can_use_bot(user_id)
+    if not can_use:
+        await message.answer(
+            "💜 Твой бесплатный период завершился.\n\nОформи подписку, чтобы продолжить 🌙",
+            reply_markup=subscribe_keyboard()
+        )
+        return
+
+    # Проверяем что есть OpenAI ключ
+    if not os.getenv("OPENAI_API_KEY"):
+        await message.answer(
+            "🎤 Голосовой ввод пока недоступен.\n\nНапиши текстом — я слушаю 💜",
+            reply_markup=back_to_menu()
+        )
+        return
+
+    # Показываем что обрабатываем
+    processing_msg = await message.answer("🎤 _Слушаю тебя..._", parse_mode="Markdown")
+
+    tmp_path = None
+    try:
+        await message.chat.do("typing")
+
+        # Скачиваем и транскрибируем
+        tmp_path = await download_voice(message.bot, message.voice.file_id)
+        text = await transcribe_voice(tmp_path)
+
+        if not text or len(text.strip()) < 2:
+            await processing_msg.edit_text("Не смогла разобрать голосовое. Попробуй ещё раз 🎤")
+            return
+
+        # Показываем что распознали
+        await processing_msg.edit_text(
+            f"🎤 _Распознала:_\n«{text}»",
+            parse_mode="Markdown"
+        )
+
+        # Дальше обрабатываем как обычный текст
+        state = await get_user_state(user_id)
+        mode = state.get("current_mode", "menu") if state else "menu"
+        context = await get_context(user_id)
+
+        if mode == "psychologist":
+            await message.chat.do("typing")
+            await increment_message_count(user_id)
+            user = await get_user(user_id)
+            name = user.get("user_name_custom") or user.get("first_name", "") if user else ""
+            memories = await format_memories_for_prompt(user_id)
+            response = await chat_psychologist(text, context, name, memories)
+            new_ctx = context + [
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": response}
+            ]
+            await save_context(user_id, new_ctx)
+            emotion = await detect_emotion(text)
+            await save_dialog(user_id, "psychologist", text, response, emotion=emotion)
+
+            user_msgs = [m["content"] for m in new_ctx if m.get("role") == "user"]
+            if len(user_msgs) == 3:
+                summary = await generate_session_summary("psychologist", user_msgs)
+                await save_memory(user_id, summary, "psychologist")
+
+            await message.answer(response, reply_markup=continue_or_menu())
+
+        elif mode == "mak_dialog":
+            await message.chat.do("typing")
+            await increment_message_count(user_id)
+            card_name = ""
+            for msg in context:
+                if "[Карта:" in msg.get("content", ""):
+                    card_name = msg["content"].replace("[Карта:", "").replace("]", "").strip()
+                    break
+            response = await get_mak_response(text, context, card_name)
+            new_ctx = context + [
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": response}
+            ]
+            await save_context(user_id, new_ctx)
+            await save_dialog(user_id, "mak", text, response)
+            await message.answer(response, reply_markup=continue_or_menu())
+
+        elif mode == "diary_dialog":
+            await message.chat.do("typing")
+            response = await chat_diary(text, context)
+            new_ctx = context + [
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": response}
+            ]
+            await save_context(user_id, new_ctx)
+            if len([m for m in new_ctx if m.get("role") == "user"]) >= 3:
+                await message.answer(response, reply_markup=diary_save_confirm())
+            else:
+                await message.answer(response, reply_markup=back_to_menu())
+
+        else:
+            # В любом другом режиме — показываем меню
+            await message.answer(
+                f"Ты сказала: _«{text}»_\n\nВыбери режим и я отвечу 💜",
+                parse_mode="Markdown",
+                reply_markup=main_menu()
+            )
+
+    except Exception as e:
+        await processing_msg.edit_text(
+            "Не смогла обработать голосовое 😔 Попробуй написать текстом."
+        )
+        import logging
+        logging.getLogger(__name__).error(f"Whisper error: {e}")
+    finally:
+        if tmp_path:
+            await cleanup_file(tmp_path)
     user_id = message.from_user.id
     text = message.text.strip()
 
