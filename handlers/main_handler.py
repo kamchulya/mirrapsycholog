@@ -30,6 +30,24 @@ from utils.keyboards import (
 router = Router()
 logger = logging.getLogger(__name__)
 
+
+def safe_text(text: str) -> str:
+    """Очищаем текст от проблемных Markdown символов для Telegram"""
+    if not text:
+        return ""
+    # Убираем заголовки ## которые Telegram не понимает
+    text = text.replace("###", "").replace("##", "").replace("# ", "")
+    # Экранируем одиночные звёздочки которые не закрыты
+    # Оставляем **bold** но убираем одиночные *
+    import re
+    # Заменяем **text** на временный маркер
+    text = re.sub(r'\*\*(.+?)\*\*', r'〔\1〕', text)
+    # Убираем одиночные *
+    text = text.replace("*", "")
+    # Возвращаем bold
+    text = re.sub(r'〔(.+?)〕', r'*\1*', text)
+    return text
+
 # ──────────────────────────────────────────────
 # МАК-КАРТЫ — реальные картинки
 # Положи свои jpg/png в папку static/mak/
@@ -285,7 +303,7 @@ async def throw_iching(callback: CallbackQuery):
     await save_dialog(user_id=callback.from_user.id, mode="iching", user_msg=user_question, bot_response=response)
 
     await callback.message.answer(
-        f"🔮 *Гексаграмма №{hexagram}*\n\n{response}",
+        f"🔮 *Гексаграмма №{hexagram}*\n\n{safe_text(response)}",
         parse_mode="Markdown",
         reply_markup=back_to_menu()
     )
@@ -546,7 +564,7 @@ async def run_meditation(callback: CallbackQuery):
 
     # Отправляем текст медитации
     await callback.message.edit_text(
-        f"🧘 *{med_data['name']}*\n\n{response}",
+        f"🧘 *{med_data['name']}*\n\n{safe_text(response)}",
         parse_mode="Markdown"
     )
 
@@ -906,7 +924,7 @@ async def handle_voice(message: Message):
             summary = await generate_session_summary("psychologist", user_msgs)
             await save_memory(user_id, summary, "psychologist")
 
-        await message.answer(response, reply_markup=continue_or_menu())
+        await message.answer(safe_text(response), parse_mode="Markdown", reply_markup=continue_or_menu())
 
     # И-ЦЗИ — принимаем вопрос
     elif mode == "iching_question":
@@ -947,7 +965,7 @@ async def handle_voice(message: Message):
         await set_user_mode(user_id, "numerology_done")
 
         await message.answer(
-            f"🔢 *Нумерологический анализ*\n\n{response}",
+            f"🔢 *Нумерологический анализ*\n\n{safe_text(response)}",
             parse_mode="Markdown",
             reply_markup=numerology_menu()
         )
@@ -973,7 +991,7 @@ async def handle_voice(message: Message):
         new_ctx = context + [{"role": "user", "content": text}, {"role": "assistant", "content": response}]
         await save_context(user_id, new_ctx)
         await save_dialog(user_id, "mak", text, response)
-        await message.answer(response, reply_markup=continue_or_menu())
+        await message.answer(safe_text(response), parse_mode="Markdown", reply_markup=continue_or_menu())
 
     # ДНЕВНИК — диалог
     elif mode == "diary_dialog":
@@ -1019,10 +1037,9 @@ async def continue_dialog(callback: CallbackQuery):
 @router.callback_query(F.data == "subscribe")
 async def handle_subscribe(callback: CallbackQuery):
     await callback.message.answer(
-        "💜 *Подписка Mirra Pro — 3 000 ₸/месяц*\n\n"
+        "💜 Подписка Mirra Pro — 3 000 ₸/месяц\n\n"
         "Для оплаты напиши администратору: @mirra_support\n\n"
         "После оплаты откроется полный доступ 🌙",
-        parse_mode="Markdown",
         reply_markup=back_to_menu()
     )
     await callback.answer()
