@@ -1,6 +1,7 @@
 import random
 import logging
 import os
+from datetime import datetime
 from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery, FSInputFile, URLInputFile
 from aiogram.filters import CommandStart, Command
@@ -187,10 +188,14 @@ async def cmd_menu(message: Message):
 
 async def finish_onboarding(message: Message, name: str):
     """Завершаем онбординг — показываем возможности и предупреждение"""
+    await message.chat.do("typing")
+
+    # Один запрос вместо двух
     await update_user(
         message.from_user.id,
         user_name_custom=name,
-        onboarding_done=1
+        onboarding_done=1,
+        last_active=datetime.now().isoformat()
     )
     await set_user_mode(message.from_user.id, "menu")
 
@@ -205,10 +210,9 @@ async def finish_onboarding(message: Message, name: str):
         f"📖 *Дневник* — я запоминаю наши разговоры\n\n"
         f"━━━━━━━━━━━━━━━━━\n"
         f"📌 *Важно про дневник*\n\n"
-        f"Все записи и наши диалоги хранятся *30 дней*.\n"
-        f"1-го числа каждого месяца я автоматически отправлю тебе "
-        f"красивый PDF со всем, что было — сохрани его себе как личный архив.\n\n"
-        f"Что сделаем сегодня? 💜",
+        f"Все записи хранятся *30 дней*. 1-го числа каждого месяца "
+        f"я пришлю тебе красивый PDF со всем что было 💜\n\n"
+        f"Что сделаем сегодня?",
         parse_mode="Markdown",
         reply_markup=main_menu()
     )
@@ -881,6 +885,10 @@ async def handle_voice(message: Message):
     finally:
         if tmp_path:
             await cleanup_file(tmp_path)
+
+
+@router.message(F.text)
+async def handle_message(message: Message):
     user_id = message.from_user.id
     text = message.text.strip()
 
@@ -899,6 +907,7 @@ async def handle_voice(message: Message):
 
     # ОНБОРДИНГ — принимаем имя
     if mode == "onboarding_name":
+        await message.chat.do("typing")
         await finish_onboarding(message, text)
         return
 
@@ -1025,7 +1034,11 @@ async def handle_voice(message: Message):
             await message.answer(response, reply_markup=back_to_menu())
 
     else:
-        await message.answer("Выбери, чем займёмся сегодня 💜", reply_markup=main_menu())
+        # Любой текст в режиме меню — показываем меню
+        await message.answer(
+            "Выбери, чем займёмся сегодня 💜",
+            reply_markup=main_menu()
+        )
 
 
 @router.callback_query(F.data == "continue_dialog")
