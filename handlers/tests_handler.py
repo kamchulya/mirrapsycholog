@@ -215,6 +215,32 @@ async def start_test(callback: CallbackQuery):
         await callback.answer("Тест не найден")
         return
 
+    # Тест "Образ денег" — бесплатно для всех
+    if test_id != "money_avatar":
+        from models.database import can_use_bot
+        can_use, reason = await can_use_bot(callback.from_user.id)
+        if not can_use:
+            from aiogram.utils.keyboard import InlineKeyboardBuilder
+            from aiogram.types import InlineKeyboardButton
+            builder = InlineKeyboardBuilder()
+            builder.row(InlineKeyboardButton(
+                text="💜 Оформить подписку — 3 000 ₸/мес",
+                callback_data="subscribe"
+            ))
+            builder.row(InlineKeyboardButton(
+                text="💰 Пройти бесплатный тест «Образ денег»",
+                callback_data="test_money_avatar"
+            ))
+            await callback.message.edit_text(
+                "💜 Твой бесплатный период завершился.\n\n"
+                "Оформи подписку чтобы проходить все тесты.\n\n"
+                "Или попробуй бесплатный тест *«Образ денег»* 👇",
+                parse_mode="Markdown",
+                reply_markup=builder.as_markup()
+            )
+            await callback.answer()
+            return
+
     # Сохраняем состояние теста
     await set_user_mode(callback.from_user.id, f"test_{test_id}_0")
     await clear_context(callback.from_user.id)

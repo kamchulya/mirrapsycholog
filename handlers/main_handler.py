@@ -1052,7 +1052,9 @@ async def handle_message(message: Message):
 
     # ТЕСТ — обрабатываем ответы
     elif mode.startswith("test_") and mode != "test_result":
-        await increment_message_count(user_id)
+        # Тест "Образ денег" — бесплатно, не считаем лимит
+        if "money_avatar" not in mode:
+            await increment_message_count(user_id)
         handled = await handle_test_answer(message, mode, text)
         if not handled:
             await message.answer("Выбери тест 💜", reply_markup=main_menu())
