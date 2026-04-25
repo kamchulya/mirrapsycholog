@@ -9,6 +9,7 @@ from aiogram.client.default import DefaultBotProperties
 
 from models.database import init_db
 from handlers.main_handler import router
+from handlers.payment_handler import router as payment_router
 from services.scheduler import setup_scheduler
 
 load_dotenv()
@@ -38,6 +39,7 @@ async def main():
         default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
     )
     dp = Dispatcher()
+    dp.include_router(payment_router)  # ← сначала payment (Stars, pre_checkout)
     dp.include_router(router)
 
     # Запускаем планировщик
