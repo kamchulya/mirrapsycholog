@@ -7,4 +7,4 @@ apscheduler
 reportlab
 pytz
 openai
-pydantic
+Pillow
