@@ -359,6 +359,22 @@ async def handle_test_answer(message: Message, mode: str, text: str):
         interpretation = await interpret_test(test["name"], answers)
         transition = await get_test_transition(test["name"], interpretation[:200])
 
+        # Извлекаем инсайт для карточки
+        insight_text = ""
+        lines = interpretation.split("\n")
+        capture = False
+        for line in lines:
+            if "Инсайт" in line or "инсайт" in line:
+                capture = True
+                continue
+            if capture and line.strip() and not line.startswith("**"):
+                insight_text = line.strip().replace("*", "").replace("_", "")
+                break
+        if not insight_text:
+            # Берём последний абзац
+            paragraphs = [p.strip() for p in interpretation.split("\n\n") if p.strip()]
+            insight_text = paragraphs[-1][:200] if paragraphs else interpretation[:200]
+
         # Сохраняем в диалоги
         answers_text = "\n".join([f"{k}: {v}" for k, v in answers.items()])
         await save_dialog(
@@ -378,6 +394,32 @@ async def handle_test_answer(message: Message, mode: str, text: str):
             f"*{test['name']} — результат*\n\n{interpretation}",
             parse_mode="Markdown"
         )
+
+        # Генерируем красивую карточку для сторис
+        try:
+            from services.card_service import generate_result_card
+            from models.database import get_user
+            user = await get_user(user_id)
+            name = user.get("user_name_custom") or user.get("first_name", "") if user else ""
+            card_path = generate_result_card(
+                test_name=test["name"],
+                insight=insight_text,
+                user_name=name
+            )
+            from aiogram.types import FSInputFile
+            await message.answer_photo(
+                photo=FSInputFile(card_path),
+                caption=(
+                    "🌙 *Сохрани карточку и поделись в сторис!*\n\n"
+                    "Пусть подруги тоже узнают себя 💜"
+                ),
+                parse_mode="Markdown"
+            )
+            import os
+            os.unlink(card_path)
+        except Exception as e:
+            logger.error(f"Ошибка генерации карточки: {e}")
+
         await message.answer(
             f"💜 {transition}",
             reply_markup=after_test_keyboard()
