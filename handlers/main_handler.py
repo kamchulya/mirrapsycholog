@@ -179,7 +179,19 @@ async def cmd_start(message: Message):
 @router.message(Command("menu"))
 async def cmd_menu(message: Message):
     await set_user_mode(message.from_user.id, "menu")
+    await clear_context(message.from_user.id)
     await message.answer("Главное меню 🏠", reply_markup=main_menu())
+
+
+@router.message(Command("reset"))
+async def cmd_reset(message: Message):
+    """Сброс состояния — помогает если бот завис"""
+    await set_user_mode(message.from_user.id, "menu")
+    await clear_context(message.from_user.id)
+    await message.answer(
+        "🔄 Состояние сброшено!\n\nВыбери с чего начнём 💜",
+        reply_markup=main_menu()
+    )
 
 
 # ──────────────────────────────────────────────
@@ -370,8 +382,9 @@ async def draw_mak_card(callback: CallbackQuery):
         {"role": "assistant", "content": f"[Карта: {card_name}]"}
     ])
 
-    # Пробуем отправить картинку
-    card_path = f"/home/claude/mirra/static/mak/{card_file}"
+    # Путь к картинке — относительный от корня проекта
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    card_path = os.path.join(base_dir, "static", "mak", card_file)
 
     caption = (
         f"🃏 *Твоя карта:*\n\n"
