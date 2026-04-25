@@ -1,5 +1,6 @@
 aiogram
 anthropic
+aiosqlite
 python-dotenv
 aiohttp
 apscheduler
