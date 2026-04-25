@@ -1,11 +1,5 @@
 [phases.setup]
-nixPkgs = ["gcc", "libpq"]
-
-[phases.install]
-cmds = [
-  "pip install --upgrade pip wheel",
-  "pip install -r requirements.txt"
-]
+nixPkgs = ["libpq"]
 
 [start]
 cmd = "python main.py"
