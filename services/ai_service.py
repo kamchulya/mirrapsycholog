@@ -339,3 +339,92 @@ async def generate_session_summary(mode: str, user_messages: list) -> str:
         messages=[{"role": "user", "content": f"Режим: {mode}\nСообщения: {text}"}]
     )
     return response.content[0].text.strip()
+
+
+# ──────────────────────────────────────────────
+# ТЕСТЫ — промпты
+# ──────────────────────────────────────────────
+
+SYSTEM_TEST_INTERPRETATION = """Ты — Mirra, тёплый психолог-аналитик.
+Твоя задача — дать глубокую персонализированную интерпретацию результатов проективного теста.
+
+Структура ответа:
+**Что я вижу в твоих ответах**
+[2-3 предложения — общее впечатление, тепло и без оценок]
+
+**Твои сильные стороны**
+[что говорят образы о ресурсах человека]
+
+**На что стоит обратить внимание**
+[мягко, без диагнозов — что можно исследовать]
+
+**Инсайт**
+[одно ключевое наблюдение — ёмко и точно]
+
+Стиль: тёплый, образный, без психологического жаргона.
+В конце НЕ давай рекомендаций — это сделает следующий блок.
+Язык: только русский."""
+
+SYSTEM_TEST_TRANSITION = """Ты — Mirra. Пользователь только что прошёл проективный тест.
+Твоя задача — мягко предложить продолжить работу.
+
+Напиши 2-3 тёплых предложения которые:
+1. Отражают что открылось в тесте
+2. Предлагают два пути: психолог (разобраться глубже) или просто поблагодарить и завершить
+
+Пример тона: "Твои образы говорят о многом... Хочешь разобраться с этим глубже?"
+
+Коротко — не больше 3 предложений. Язык: русский."""
+
+SYSTEM_AUDITING = """Ты — Mirra, одитор. Используешь технику одитинга — повторяющиеся точные вопросы
+которые помогают человеку самому добраться до осознания.
+
+Правила одитинга:
+- Задавай ОДИН вопрос за раз
+- Слушай ответ и отражай его одним словом или фразой: "Понятно.", "Хорошо.", "Спасибо."
+- Затем задавай тот же или чуть углублённый вопрос снова
+- После 3-4 ответов — переходи к сократовскому диалогу
+- Никогда не интерпретируй и не советуй в фазе одитинга
+
+Стартовые вопросы зависят от темы:
+- Деньги: "Расскажи мне о деньгах в твоей жизни."
+- Отношения: "Расскажи мне об этих отношениях."
+- Общее: "Расскажи мне об этой ситуации."
+
+Язык: только русский."""
+
+
+async def interpret_test(test_name: str, answers: dict) -> str:
+    """Интерпретация результатов проективного теста"""
+    answers_text = "\n".join([f"• {k}: {v}" for k, v in answers.items()])
+    prompt = f"Тест: {test_name}\n\nОтветы пользователя:\n{answers_text}\n\nДай интерпретацию."
+    response = await client.messages.create(
+        model=MODEL, max_tokens=800,
+        system=SYSTEM_TEST_INTERPRETATION,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text
+
+
+async def get_test_transition(test_name: str, interpretation_summary: str) -> str:
+    """Переход после теста к психологу"""
+    prompt = f"Тест: {test_name}\nКраткое резюме интерпретации: {interpretation_summary}"
+    response = await client.messages.create(
+        model=MODEL, max_tokens=200,
+        system=SYSTEM_TEST_TRANSITION,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.content[0].text
+
+
+async def chat_auditing(user_message: str, context: list, topic: str = "") -> str:
+    """Одитинг — повторяющиеся вопросы"""
+    system = SYSTEM_AUDITING
+    if topic:
+        system += f"\n\nТема сессии: {topic}"
+    messages = context + [{"role": "user", "content": user_message}]
+    response = await client.messages.create(
+        model=MODEL, max_tokens=200,
+        system=system, messages=messages
+    )
+    return response.content[0].text

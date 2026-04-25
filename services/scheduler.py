@@ -17,8 +17,24 @@ from utils.keyboards import main_menu
 logger = logging.getLogger(__name__)
 
 
+async def keepalive_ping():
+    """Пингуем базу каждые 4 минуты чтобы не засыпала"""
+    try:
+        from models.database import _execute
+        _execute("SELECT 1", fetch="one")
+        logger.debug("✅ DB keepalive ok")
+    except Exception as e:
+        logger.warning(f"DB keepalive error: {e}")
+
+
 def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="Asia/Almaty")
+
+    # Keep-alive пинг БД — каждые 4 минуты чтобы Postgres не засыпал
+    scheduler.add_job(
+        keepalive_ping, CronTrigger(minute="*/4"),
+        id="keepalive", replace_existing=True
+    )
 
     # Вечерний чекин — каждый день в 20:00
     scheduler.add_job(

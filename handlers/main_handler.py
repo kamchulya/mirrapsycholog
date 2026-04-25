@@ -20,7 +20,7 @@ from services.ai_service import (
     generate_weekly_report, detect_emotion, generate_diary_summary,
     generate_session_summary
 )
-from services.voice_service import transcribe_voice, download_voice, cleanup_file
+from handlers.tests_handler import handle_test_answer, handle_auditing
 from utils.keyboards import (
     main_menu, iching_intro, iching_confirm, mak_intro, mak_draw,
     mak_after_card, numerology_menu, numerology_other, meditation_menu,
@@ -248,9 +248,15 @@ async def start_psychologist(callback: CallbackQuery):
     await clear_context(callback.from_user.id)
     await callback.message.edit_text(
         "🧠 *Режим: Психолог*\n\n"
-        "Я здесь, чтобы выслушать тебя. Буду не советовать, "
-        "а задавать вопросы — чтобы ты сама нашла ответ.\n\n"
-        "Расскажи — что сейчас происходит?",
+        "Я здесь, чтобы быть рядом с тобой в этот момент.\n\n"
+        "События в жизни происходят вне зависимости от нашего желания "
+        "либо отрицания. Бывает так, что мир вокруг кажется слишком тяжёлым, "
+        "и это нормально — чувствовать растерянность или усталость.\n\n"
+        "Я помогу тебе найти ту точку опоры, где ты сможешь почувствовать "
+        "себя спокойнее и увереннее. Мы вместе во всём разберёмся.\n\n"
+        "Я здесь, чтобы помочь тебе посмотреть на ситуацию с другой стороны — "
+        "не советовать, а задавать вопросы. Иногда правильный вопрос меняет всё.\n\n"
+        "Расскажи, что у тебя сейчас на душе? Я внимательно слушаю 💜",
         parse_mode="Markdown",
         reply_markup=back_to_menu()
     )
@@ -1045,6 +1051,18 @@ async def handle_message(message: Message):
             await message.answer(response, reply_markup=diary_save_confirm())
         else:
             await message.answer(response, reply_markup=back_to_menu())
+
+    # ТЕСТ — обрабатываем ответы
+    elif mode.startswith("test_") and mode != "test_result":
+        await increment_message_count(user_id)
+        handled = await handle_test_answer(message, mode, text)
+        if not handled:
+            await message.answer("Выбери тест 💜", reply_markup=main_menu())
+
+    # ОДИТИНГ — после теста
+    elif mode == "auditing":
+        await increment_message_count(user_id)
+        await handle_auditing(message, text)
 
     else:
         # Любой текст в режиме меню — показываем меню

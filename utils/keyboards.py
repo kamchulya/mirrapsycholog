@@ -10,6 +10,7 @@ def main_menu() -> InlineKeyboardMarkup:
         InlineKeyboardButton(text="🃏 МАК-карта", callback_data="mode_mak"),
         InlineKeyboardButton(text="🔢 Нумерология", callback_data="mode_numerology")
     )
+    builder.row(InlineKeyboardButton(text="🔬 Проективные тесты", callback_data="mode_tests"))
     builder.row(InlineKeyboardButton(text="🧘 Медитация дня", callback_data="mode_meditation"))
     builder.row(InlineKeyboardButton(text="📖 Мой дневник", callback_data="mode_diary"))
     return builder.as_markup()
