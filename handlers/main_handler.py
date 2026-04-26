@@ -23,6 +23,7 @@ from services.ai_service import (
     generate_session_summary
 )
 from handlers.tests_handler import handle_test_answer, handle_auditing
+from services.voice_service import transcribe_voice, download_voice, cleanup_file
 from utils.keyboards import (
     main_menu, iching_intro, iching_confirm, mak_intro, mak_draw,
     mak_after_card, numerology_menu, numerology_other, meditation_menu,
