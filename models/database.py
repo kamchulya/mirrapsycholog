@@ -363,3 +363,138 @@ async def increment_message_count(user_id):
             (user_id,)
         )
     await _run(_inc)
+
+
+# ──────────────────────────────────────────────
+# РЕФЕРАЛЫ
+# ──────────────────────────────────────────────
+
+def _create_referral_tables():
+    p = _init_pool()
+    conn = p.getconn()
+    try:
+        with conn.cursor() as cur:
+            # Реферальные коды блогеров
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS referrals (
+                    id SERIAL PRIMARY KEY,
+                    ref_code TEXT UNIQUE NOT NULL,
+                    blogger_username TEXT NOT NULL,
+                    blogger_telegram_id BIGINT,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            # Кто от кого пришёл
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS ref_conversions (
+                    id SERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    ref_code TEXT NOT NULL,
+                    paid INTEGER DEFAULT 0,
+                    amount INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            # Добавляем колонку ref_code в users если нет
+            cur.execute("""
+                ALTER TABLE users
+                ADD COLUMN IF NOT EXISTS ref_code TEXT
+            """)
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        p.putconn(conn)
+
+
+async def init_referral_tables():
+    await _run(_create_referral_tables)
+
+
+async def create_ref_code(ref_code: str, blogger_username: str, blogger_telegram_id: int = None):
+    def _create():
+        _execute(
+            """INSERT INTO referrals (ref_code, blogger_username, blogger_telegram_id)
+               VALUES (%s, %s, %s) ON CONFLICT (ref_code) DO NOTHING""",
+            (ref_code, blogger_username, blogger_telegram_id)
+        )
+    await _run(_create)
+
+
+async def get_ref_code(ref_code: str):
+    def _get():
+        row = _execute(
+            "SELECT * FROM referrals WHERE ref_code = %s",
+            (ref_code,), fetch="one"
+        )
+        return dict(row) if row else None
+    return await _run(_get)
+
+
+async def save_ref_conversion(user_id: int, ref_code: str):
+    def _save():
+        _execute(
+            """INSERT INTO ref_conversions (user_id, ref_code)
+               VALUES (%s, %s) ON CONFLICT DO NOTHING""",
+            (user_id, ref_code)
+        )
+        _execute(
+            "UPDATE users SET ref_code = %s WHERE telegram_id = %s",
+            (ref_code, user_id)
+        )
+    await _run(_save)
+
+
+async def mark_ref_paid(user_id: int, amount: int):
+    """Отмечаем что пользователь оплатил — считаем комиссию блогеру"""
+    def _mark():
+        _execute(
+            """UPDATE ref_conversions
+               SET paid = 1, amount = %s
+               WHERE user_id = %s""",
+            (amount, user_id)
+        )
+    await _run(_mark)
+
+
+async def get_ref_stats(ref_code: str = None) -> list:
+    """Статистика по рефералам"""
+    def _get():
+        if ref_code:
+            rows = _execute(
+                """SELECT r.blogger_username, r.ref_code,
+                   COUNT(rc.id) as total,
+                   SUM(rc.paid) as paid_count,
+                   SUM(rc.amount) as total_amount
+                   FROM referrals r
+                   LEFT JOIN ref_conversions rc ON r.ref_code = rc.ref_code
+                   WHERE r.ref_code = %s
+                   GROUP BY r.blogger_username, r.ref_code""",
+                (ref_code,), fetch="all"
+            )
+        else:
+            rows = _execute(
+                """SELECT r.blogger_username, r.ref_code,
+                   COUNT(rc.id) as total,
+                   SUM(COALESCE(rc.paid, 0)) as paid_count,
+                   SUM(COALESCE(rc.amount, 0)) as total_amount
+                   FROM referrals r
+                   LEFT JOIN ref_conversions rc ON r.ref_code = rc.ref_code
+                   GROUP BY r.blogger_username, r.ref_code
+                   ORDER BY paid_count DESC""",
+                fetch="all"
+            )
+        return [dict(r) for r in rows] if rows else []
+    return await _run(_get)
+
+
+async def get_user_ref_code(user_id: int) -> str:
+    """Получаем реф-код пользователя"""
+    def _get():
+        row = _execute(
+            "SELECT ref_code FROM users WHERE telegram_id = %s",
+            (user_id,), fetch="one"
+        )
+        return row["ref_code"] if row and row["ref_code"] else None
+    return await _run(_get)
