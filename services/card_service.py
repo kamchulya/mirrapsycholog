@@ -41,12 +41,12 @@ def generate_result_card(
 
     # ── ЛОГОТИП MIRRA ──
     try:
-        font_title = _get_font(120)
-        font_subtitle = _get_font(36)
+        font_title = _get_font(80, bold=True)
+        font_subtitle = _get_font(34)
         font_body = _get_font(44)
-        font_insight = _get_font(40)
-        font_small = _get_font(30)
-        font_handle = _get_font(32)
+        font_insight = _get_font(38)
+        font_small = _get_font(28)
+        font_handle = _get_font(30, bold=True)
     except Exception:
         font_title = font_subtitle = font_body = font_insight = font_small = font_handle = None
 
@@ -147,17 +147,25 @@ def _draw_rounded_rect(draw, x1, y1, x2, y2, radius, fill):
     draw.rounded_rectangle([x1, y1, x2, y2], radius=radius, fill=r)
 
 
-def _get_font(size: int):
-    """Пробуем найти хороший шрифт"""
-    font_paths = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+def _get_font(size: int, bold: bool = False):
+    """Загружаем шрифт из папки проекта — гарантированно есть кириллица"""
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    font_name = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
+    font_path = os.path.join(base, "static", "fonts", font_name)
+
+    if os.path.exists(font_path):
+        return ImageFont.truetype(font_path, size)
+
+    # Запасной вариант — системные шрифты
+    fallback_paths = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
-        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
     ]
-    for path in font_paths:
+    for path in fallback_paths:
         if os.path.exists(path):
             return ImageFont.truetype(path, size)
+
     return ImageFont.load_default()
 
 
