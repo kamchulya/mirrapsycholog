@@ -68,14 +68,16 @@ def setup_scheduler(bot: Bot) -> AsyncIOScheduler:
 # ──────────────────────────────────────────────
 
 async def evening_checkin(bot: Bot):
+    """Вечернее напоминание — для ВСЕХ пользователей бесплатно"""
     users = await get_all_users()
     logger.info(f"Вечерний чекин: {len(users)} пользователей")
 
     messages = [
-        "Добрый вечер 🌙\n\nКак прошёл твой день? Хочешь записать его в дневник?",
-        "Вечер настал ✨\n\nЧто важного произошло сегодня? Давай запишем вместе.",
-        "🌙 Хороший момент остановиться и подышать.\n\nКак ты сейчас?",
-        "Добрый вечер 💜\n\nЯ здесь, если хочешь поделиться тем, как прошёл день.",
+        "🌙 Как прошёл твой день?\n\nЗапиши одну эмоцию — бесплатно, 5 секунд 💜",
+        "Добрый вечер ✨\n\nОдна эмоция дня — и твой дневник пополнится. Как ты сейчас?",
+        "🌙 Стоп. Выдохни.\n\nКак ты сегодня? Одно нажатие — и день зафиксирован 💜",
+        "Вечер настал 🌿\n\nЧто осталось от сегодняшнего дня внутри тебя?",
+        "🌙 Mirra здесь.\n\nКак одним словом описать твой сегодняшний день?",
     ]
 
     for user in users:
@@ -83,9 +85,16 @@ async def evening_checkin(bot: Bot):
             from aiogram.utils.keyboard import InlineKeyboardBuilder
             from aiogram.types import InlineKeyboardButton
             builder = InlineKeyboardBuilder()
-            builder.row(InlineKeyboardButton(text="📝 Записать день", callback_data="diary_write"))
-            builder.row(InlineKeyboardButton(text="😊 Как я сейчас?", callback_data="diary_mood"))
-            builder.row(InlineKeyboardButton(text="Не сейчас", callback_data="back_menu"))
+            builder.row(
+                InlineKeyboardButton(text="😊 Хорошо", callback_data="mood_good"),
+                InlineKeyboardButton(text="😐 Нормально", callback_data="mood_normal"),
+                InlineKeyboardButton(text="😔 Грустно", callback_data="mood_sad")
+            )
+            builder.row(
+                InlineKeyboardButton(text="😰 Тревожно", callback_data="mood_anxious"),
+                InlineKeyboardButton(text="😤 Злюсь", callback_data="mood_angry"),
+                InlineKeyboardButton(text="😴 Устала", callback_data="mood_tired")
+            )
 
             await bot.send_message(
                 chat_id=user["telegram_id"],
