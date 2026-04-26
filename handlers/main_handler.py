@@ -3,8 +3,10 @@ import logging
 import os
 from datetime import datetime
 from aiogram import Router, F
-from aiogram.types import Message, CallbackQuery, FSInputFile, URLInputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.filters import CommandStart, Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardButton
 
 from models.database import (
     get_or_create_user, get_user, update_user, get_user_state,
@@ -148,11 +150,24 @@ MEDITATION_YOUTUBE = {
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
+    # Проверяем реф-код
+    args = message.text.split()
+    ref_code = args[1] if len(args) > 1 and args[1].startswith("ref_") else None
+
     user = await get_or_create_user(
         telegram_id=message.from_user.id,
         username=message.from_user.username,
         first_name=message.from_user.first_name
     )
+
+    # Сохраняем реф если пришёл по ссылке впервые
+    if ref_code and not user.get("ref_code"):
+        from models.database import get_ref_code, save_ref_conversion
+        ref = await get_ref_code(ref_code)
+        if ref:
+            await save_ref_conversion(message.from_user.id, ref_code)
+            logger.info(f"Реферал {message.from_user.id} от {ref_code}")
+
     await set_user_mode(message.from_user.id, "menu")
     await clear_context(message.from_user.id)
 
@@ -728,12 +743,47 @@ async def save_mood(callback: CallbackQuery):
         "mood_good": "Как здорово! Держи это состояние 🌟",
         "mood_normal": "Нормально — это тоже хорошо. Ровное состояние — это отдых 🌿",
         "mood_sad": "Грусть — это тоже часть тебя. Хочешь поговорить? 💙",
-        "mood_anxious": "Тревога говорит о том, что что-то важно для тебя. Разберёмся? 🤍",
-        "mood_angry": "Злость — это сила без применения. Трансформируем? 🔥",
-        "mood_tired": "Усталость — сигнал тела. Может, медитация на восстановление? 💜",
+        "mood_anxious": "Тревога говорит о том, что что-то важно для тебя 🤍",
+        "mood_angry": "Злость — это сила без применения 🔥",
+        "mood_tired": "Усталость — сигнал тела. Береги себя 💜",
     }
+    text = responses.get(callback.data, "Записала 💜")
+
+    # Проверяем подписку — если нет, показываем тизер PDF
+    can_use, reason = await can_use_bot(callback.from_user.id)
+
+    if reason != "subscribed":
+        # Считаем сколько эмоций накопилось
+        from models.database import get_month_diary
+        entries = await get_month_diary(callback.from_user.id)
+        mood_count = len([e for e in entries if e.get("entry_type") == "mood"])
+
+        if mood_count >= 7:
+            # Достаточно накопилось — показываем тизер
+            builder = InlineKeyboardBuilder()
+            builder.row(InlineKeyboardButton(
+                text="📊 Получить PDF отчёт за месяц",
+                callback_data="subscribe"
+            ))
+            builder.row(InlineKeyboardButton(
+                text="Позже",
+                callback_data="back_menu"
+            ))
+            await callback.message.edit_text(
+                f"Записала: *{mood}*\n\n{text}\n\n"
+                f"━━━━━━━━━━━━━━━━━\n"
+                f"📖 Ты уже записала *{mood_count} эмоций* этого месяца!\n\n"
+                f"В Mirra Pro я собираю всё это в красивый PDF отчёт — "
+                f"твоя эмоциональная карта месяца, инсайты, паттерны. "
+                f"Очень интересно смотреть как меняется состояние 💜",
+                parse_mode="Markdown",
+                reply_markup=builder.as_markup()
+            )
+            await callback.answer()
+            return
+
     await callback.message.edit_text(
-        f"Записала: *{mood}*\n\n{responses.get(callback.data, '💜')}",
+        f"Записала: *{mood}*\n\n{text}",
         parse_mode="Markdown",
         reply_markup=main_menu()
     )
