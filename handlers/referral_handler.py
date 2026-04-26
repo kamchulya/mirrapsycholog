@@ -14,7 +14,7 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-COMMISSION_PERCENT = 10  # % от оплаты блогеру
+COMMISSION_PERCENT = 25  # % от оплаты блогеру
 
 
 def is_admin(user_id: int) -> bool:
