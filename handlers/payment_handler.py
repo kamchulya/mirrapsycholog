@@ -17,7 +17,11 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
-STARS_PRICE = 680  # 680 Telegram Stars ≈ ~3000₸
+STARS_PRICE = 300
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@mirra_support")
+TON_WALLET = "kamshat 8458"  # Telegram Wallet для России
+RU_PRICE = "$7"
+KZ_PRICE = "3 000 ₸"
 
 # ──────────────────────────────────────────────
 # КЛАВИАТУРА ОПЛАТЫ
@@ -30,8 +34,12 @@ def payment_keyboard() -> InlineKeyboardMarkup:
         callback_data="pay_stars"
     ))
     builder.row(InlineKeyboardButton(
-        text="💳 Оплатить вручную (карта/Kaspi)",
+        text="💳 Kaspi / карта (Казахстан)",
         callback_data="pay_manual"
+    ))
+    builder.row(InlineKeyboardButton(
+        text="💎 TON / Telegram Wallet (Россия и др.)",
+        callback_data="pay_ton"
     ))
     builder.row(InlineKeyboardButton(
         text="🏠 Главное меню",
@@ -53,13 +61,15 @@ def back_to_payment() -> InlineKeyboardMarkup:
 @router.callback_query(F.data == "subscribe")
 async def show_payment_options(callback: CallbackQuery):
     await callback.message.edit_text(
-        "💜 *Mirra Pro — 3 000 ₸ / месяц*\n\n"
+        "💜 *Mirra Pro*\n\n"
+        "🇰🇿 Казахстан: *3 000 ₸/месяц*\n"
+        "🇷🇺 Россия и др.: *$7/месяц* (~650₽)\n\n"
         "Что входит:\n"
         "✅ Безлимитные диалоги с психологом\n"
-        "✅ Гадания И-Цзин и МАК-карты\n"
-        "✅ Нумерология и матрица судьбы\n"
+        "✅ Все 8 проективных тестов\n"
+        "✅ И-Цзин, МАК-карты, нумерология\n"
         "✅ Медитации и визуализации\n"
-        "✅ Личный дневник + еженедельный отчёт\n\n"
+        "✅ Личный дневник + PDF отчёт\n\n"
         "Выбери способ оплаты 👇",
         parse_mode="Markdown",
         reply_markup=payment_keyboard()
@@ -132,22 +142,34 @@ async def successful_payment(message: Message):
 # ВАРИАНТ 2 — РУЧНАЯ ОПЛАТА
 # ──────────────────────────────────────────────
 
-@router.callback_query(F.data == "pay_manual")
-async def pay_manual(callback: CallbackQuery):
-    admin_username = os.getenv("ADMIN_USERNAME", "@mirra_admin")
-
+@router.callback_query(F.data == "pay_ton")
+async def pay_ton(callback: CallbackQuery):
     await callback.message.edit_text(
-        "💳 *Оплата вручную*\n\n"
-        f"Напиши администратору: *{admin_username}*\n\n"
-        "В сообщении укажи:\n"
-        "• Что хочешь оформить подписку Mirra Pro\n"
-        "• Свой username или имя\n\n"
-        "После подтверждения оплаты доступ откроется автоматически 🌙\n\n"
-        f"👉 [Написать администратору](https://t.me/{admin_username.replace('@', '')})",
+        "💎 *Оплата через Telegram Wallet / TON*\n\n"
+        "Стоимость: *$7 в месяц* (~650₽)\n\n"
+        "Переведи на Telegram username:\n"
+        "*@kamshat8458*\n\n"
+        "Или на TON-кошелёк — напиши мне и я пришлю адрес.\n\n"
+        "📌 *Важно:* в комментарии к переводу укажи свой "
+        "Telegram username чтобы я могла найти тебя и открыть доступ.\n\n"
+        "После оплаты напиши администратору 👇",
         parse_mode="Markdown",
-        reply_markup=back_to_payment()
+        reply_markup=_pay_ton_keyboard()
     )
     await callback.answer()
+
+
+def _pay_ton_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="✅ Написать после оплаты",
+        url="https://t.me/kamshat8458"
+    ))
+    builder.row(InlineKeyboardButton(
+        text="◀️ Назад",
+        callback_data="subscribe"
+    ))
+    return builder.as_markup()
 
 
 # ──────────────────────────────────────────────
