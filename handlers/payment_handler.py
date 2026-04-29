@@ -20,6 +20,7 @@ ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
 STARS_PRICE = 300
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "@mirra_support")
 TON_WALLET = "kamshat 8458"  # Telegram Wallet для России
+KASPI_PHONE = os.getenv("KASPI_PHONE", "+7 XXX XXX XX XX")
 RU_PRICE = "$7"
 KZ_PRICE = "3 000 ₸"
 
@@ -105,22 +106,18 @@ async def successful_payment(message: Message):
     user_id = message.from_user.id
     payload = message.successful_payment.invoice_payload
 
-    # Открываем подписку на 30 дней
     until = (datetime.now() + timedelta(days=30)).isoformat()
     await update_user(user_id, is_subscribed=1, subscription_until=until)
 
     stars_amount = message.successful_payment.total_amount
-
     logger.info(f"✅ Оплата Stars от {user_id}: {stars_amount} Stars")
 
-    # Уведомляем администратора
     if ADMIN_ID:
         user = await get_user(user_id)
         name = user.get("first_name", "—") if user else "—"
         username = user.get("username", "—") if user else "—"
         try:
             from aiogram import Bot
-            # Получаем bot из контекста — он передаётся через middleware
             pass
         except Exception:
             pass
@@ -133,13 +130,45 @@ async def successful_payment(message: Message):
         parse_mode="Markdown"
     )
 
-    # Отправляем главное меню
     from utils.keyboards import main_menu
     await message.answer("Что сделаем сегодня?", reply_markup=main_menu())
 
 
 # ──────────────────────────────────────────────
-# ВАРИАНТ 2 — РУЧНАЯ ОПЛАТА
+# ВАРИАНТ 2 — KASPI / КАРТА
+# ──────────────────────────────────────────────
+
+@router.callback_query(F.data == "pay_manual")
+async def pay_manual(callback: CallbackQuery):
+    await callback.message.edit_text(
+        "💳 *Оплата через Kaspi / карту*\n\n"
+        f"Стоимость: *{KZ_PRICE}/месяц*\n\n"
+        f"Переведи на номер телефона:\n"
+        f"*{KASPI_PHONE}*\n\n"
+        "📌 *Важно:* в комментарии к переводу укажи свой "
+        "Telegram username, чтобы я могла найти тебя и открыть доступ.\n\n"
+        "После оплаты напиши администратору 👇",
+        parse_mode="Markdown",
+        reply_markup=_pay_manual_keyboard()
+    )
+    await callback.answer()
+
+
+def _pay_manual_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(
+        text="✅ Написать после оплаты",
+        url=f"https://t.me/{ADMIN_USERNAME.lstrip('@')}"
+    ))
+    builder.row(InlineKeyboardButton(
+        text="◀️ Назад",
+        callback_data="subscribe"
+    ))
+    return builder.as_markup()
+
+
+# ──────────────────────────────────────────────
+# ВАРИАНТ 3 — TON / TELEGRAM WALLET
 # ──────────────────────────────────────────────
 
 @router.callback_query(F.data == "pay_ton")
@@ -185,7 +214,6 @@ async def cmd_admin(message: Message):
     if not is_admin(message.from_user.id):
         return
 
-    # Открываем вечный доступ для самого себя
     until = "2099-01-01T00:00:00"
     await update_user(message.from_user.id, is_subscribed=1, subscription_until=until)
 
@@ -221,12 +249,9 @@ async def cmd_give_access(message: Message):
     days = int(parts[2]) if len(parts) > 2 else 30
 
     try:
-        # Если число — это ID
         if target.isdigit():
             target_id = int(target)
         else:
-            # Ищем по username в базе
-            pool = None
             from models.database import _init_pool
             import psycopg2.extras
             p = _init_pool()
@@ -253,13 +278,11 @@ async def cmd_give_access(message: Message):
             name = user.get("first_name", target)
             await message.answer(f"✅ Нашла: {name} (ID: {target_id})")
 
-        # Даём доступ
         from datetime import datetime, timedelta
         from models.database import update_user
         until = (datetime.now() + timedelta(days=days)).isoformat()
         await update_user(target_id, is_subscribed=1, subscription_until=until)
 
-        # Уведомляем пользователя
         try:
             from utils.keyboards import main_menu
             await message.bot.send_message(
