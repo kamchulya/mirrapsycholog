@@ -147,7 +147,9 @@ async def pay_manual(callback: CallbackQuery):
         f"*{KASPI_PHONE}*\n\n"
         "📌 *Важно:* в комментарии к переводу укажи свой "
         "Telegram username, чтобы я могла найти тебя и открыть доступ.\n\n"
-        "После оплаты напиши администратору 👇",
+        "После оплаты напиши мне:\n"
+        "💬 WhatsApp: +77053458458\n"
+        "или нажми кнопку ниже 👇",
         parse_mode="Markdown",
         reply_markup=_pay_manual_keyboard()
     )
