@@ -176,7 +176,9 @@ async def cmd_start(message: Message):
     if user.get("onboarding_done"):
         name = user.get("user_name_custom") or user.get("first_name") or "дорогая"
         await message.answer(
-            f"С возвращением, {name}! 🌙\n\nЧто сделаем сегодня?",
+            f"С возвращением, {name}! 🌙\n\nЧто сделаем сегодня?\n\n"
+            f"кстати, напоминаю — тест *Образ денег* бесплатный 🎁 если ещё не пробовала — очень советую 😊",
+            parse_mode="Markdown",
             reply_markup=main_menu()
         )
         return
@@ -240,7 +242,8 @@ async def finish_onboarding(message: Message, name: str):
         f"📌 *Важно про дневник*\n\n"
         f"Все записи хранятся *30 дней*. 1-го числа каждого месяца "
         f"я пришлю тебе красивый PDF со всем что было 💜\n\n"
-        f"Что сделаем сегодня?",
+        f"Что сделаем сегодня?\n\n"
+        f"кстати, тест *Образ денег* — бесплатно 🎁 многие говорят что за 5 минут увидели то что годами не могли понять про себя. попробуй 👇",
         parse_mode="Markdown",
         reply_markup=main_menu()
     )
