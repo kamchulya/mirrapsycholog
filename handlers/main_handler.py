@@ -25,11 +25,28 @@ from services.ai_service import (
 from handlers.tests_handler import handle_test_answer, handle_auditing
 from services.voice_service import transcribe_voice, download_voice, cleanup_file
 from utils.keyboards import (
-    main_menu, iching_intro, iching_confirm, mak_intro, mak_draw,
+    main_menu as _main_menu_old, iching_intro, iching_confirm, mak_intro, mak_draw,
     mak_after_card, numerology_menu, numerology_other, meditation_menu,
     diary_menu, diary_save_confirm, diary_followup, back_to_menu,
     continue_or_menu, subscribe_keyboard, mood_keyboard
 )
+from aiogram.utils.keyboard import InlineKeyboardBuilder as _IKB
+from aiogram.types import InlineKeyboardButton as _IKBtn, InlineKeyboardMarkup as _IKM
+
+
+def main_menu() -> _IKM:
+    builder = _IKB()
+    builder.row(_IKBtn(text="🧠 Поговорить с психологом", callback_data="mode_psychologist"))
+    builder.row(_IKBtn(text="🔮 Гадание И-Цзин", callback_data="mode_iching"))
+    builder.row(
+        _IKBtn(text="🃏 МАК-карта", callback_data="mode_mak"),
+        _IKBtn(text="🔢 Нумерология", callback_data="mode_numerology")
+    )
+    builder.row(_IKBtn(text="🔬 Проективные тесты", callback_data="mode_tests"))
+    builder.row(_IKBtn(text="🧘 Медитация дня", callback_data="mode_meditation"))
+    builder.row(_IKBtn(text="🧩 Проработка убеждений", callback_data="beliefs_menu"))
+    builder.row(_IKBtn(text="📖 Мой дневник", callback_data="mode_diary"))
+    return builder.as_markup()
 
 router = Router()
 logger = logging.getLogger(__name__)
