@@ -12,6 +12,7 @@ def main_menu() -> InlineKeyboardMarkup:
     )
     builder.row(InlineKeyboardButton(text="🔬 Проективные тесты", callback_data="mode_tests"))
     builder.row(InlineKeyboardButton(text="🧘 Медитация дня", callback_data="mode_meditation"))
+    builder.row(InlineKeyboardButton(text="🧩 Проработка убеждений", callback_data="beliefs_menu"))
     builder.row(InlineKeyboardButton(text="📖 Мой дневник", callback_data="mode_diary"))
     return builder.as_markup()
 
