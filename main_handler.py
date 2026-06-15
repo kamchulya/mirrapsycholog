@@ -186,10 +186,11 @@ async def cmd_start(message: Message):
     # Новый пользователь — онбординг
     await set_user_mode(message.from_user.id, "onboarding_name")
     await message.answer(
-        "Привет! 🌙\n\n"
-        "Я — *Mirra*, твоё личное пространство тишины и честных ответов.\n"
-        "Когда мир вокруг шумит — я помогу услышать себя.\n\n"
-        "*Как тебя зовут?* Напиши своё имя 👇",
+        "Привет 🌸\n\n"
+        "Я Мирра — твой личный психолог в телефоне.\n\n"
+        "Здесь не будет лекций и домашних заданий. Только ты, я и пространство где можно честно поговорить о том что важно.\n\n"
+        "А ещё — заглянуть туда, куда обычно не заглядываем. Узнать себя с неожиданной стороны. Найти то, что давно лежит внутри и незаметно управляет твоей жизнью — отношениями, деньгами, выборами, настроением. Иногда достаточно просто увидеть это — и что-то меняется 🌿\n\n"
+        "Но сначала — *как тебя зовут?* 👇",
         parse_mode="Markdown"
     )
 
@@ -217,10 +218,9 @@ async def cmd_reset(message: Message):
 # ──────────────────────────────────────────────
 
 async def finish_onboarding(message: Message, name: str):
-    """Завершаем онбординг — показываем возможности и предупреждение"""
+    """Завершаем онбординг — интерактивное знакомство с разделами"""
     await message.chat.do("typing")
 
-    # Один запрос вместо двух
     await update_user(
         message.from_user.id,
         user_name_custom=name,
@@ -229,24 +229,147 @@ async def finish_onboarding(message: Message, name: str):
     )
     await set_user_mode(message.from_user.id, "menu")
 
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧠 Психолог", callback_data="about_psychologist"))
+    builder.row(InlineKeyboardButton(text="🔮 И-Цзин", callback_data="about_iching"))
+    builder.row(InlineKeyboardButton(text="🃏 МАК-карты", callback_data="about_mak"))
+    builder.row(InlineKeyboardButton(text="🔢 Нумерология", callback_data="about_numerology"))
+    builder.row(InlineKeyboardButton(text="🧘 Медитации", callback_data="about_meditation"))
+    builder.row(InlineKeyboardButton(text="🧩 Проработка убеждений", callback_data="about_beliefs"))
+    builder.row(InlineKeyboardButton(text="✨ Всё понятно, начнём!", callback_data="onboarding_done"))
+
     await message.answer(
-        f"Очень приятно, *{name}*! 💜\n\n"
-        f"*Что я умею:*\n"
-        f"🧠 *Психолог* — разобраться в ситуации через вопросы\n"
-        f"🔮 *И-Цзин* — мудрость древней книги перемен\n"
-        f"🃏 *МАК-карты* — работа с подсознанием через образы\n"
-        f"🔢 *Нумерология* — узнать себя глубже\n"
-        f"🧘 *Медитации* — практики Диспензы и визуализации\n"
-        f"📖 *Дневник* — я запоминаю наши разговоры\n\n"
-        f"━━━━━━━━━━━━━━━━━\n"
-        f"📌 *Важно про дневник*\n\n"
-        f"Все записи хранятся *30 дней*. 1-го числа каждого месяца "
-        f"я пришлю тебе красивый PDF со всем что было 💜\n\n"
-        f"Что сделаем сегодня?\n\n"
-        f"кстати, тест *Образ денег* — бесплатно 🎁 многие говорят что за 5 минут увидели то что годами не могли понять про себя. попробуй 👇",
+        f"Очень приятно, *{name}* 🌸\n\n"
+        f"У меня есть несколько инструментов — каждый для своего момента.\n"
+        f"Нажми на любой чтобы узнать подробнее 👇",
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup()
+    )
+
+
+# ──────────────────────────────────────────────
+# ОНБОРДИНГ — знакомство с разделами
+# ──────────────────────────────────────────────
+
+SECTION_INFO = {
+    "about_psychologist": (
+        "🧠 *Психолог*\n\n"
+        "Поговори со мной как с настоящим психологом — про отношения, тревогу, работу, что угодно. "
+        "Я задаю вопросы, помогаю увидеть ситуацию по-новому и найти свой ответ.\n\n"
+        "Это не советы. Это разговор который помогает."
+    ),
+    "about_iching": (
+        "🔮 *И-Цзин*\n\n"
+        "Древняя книга перемен — один из самых точных инструментов для понимания ситуации. "
+        "Задаёшь вопрос, бросаешь монеты, я даю толкование.\n\n"
+        "Многие удивляются насколько точно это попадает."
+    ),
+    "about_mak": (
+        "🃏 *МАК-карты*\n\n"
+        "Метафорические карты — работа с подсознанием через образы. "
+        "Вытягиваешь карту, описываешь что видишь — и это открывает то, что сложно увидеть напрямую.\n\n"
+        "Особенно хорошо работает когда не знаешь как сформулировать проблему."
+    ),
+    "about_numerology": (
+        "🔢 *Нумерология*\n\n"
+        "Узнай своё число судьбы, число души, матрицу года. "
+        "Это не гадание — это язык закономерностей.\n\n"
+        "Иногда цифры объясняют то, что казалось необъяснимым."
+    ),
+    "about_meditation": (
+        "🧘 *Медитации*\n\n"
+        "Практики на основе методов Джо Диспензы и визуализации. "
+        "Снять тревогу, восстановиться, настроиться на изобилие или просто выдохнуть.\n\n"
+        "5-10 минут — и внутри становится тише."
+    ),
+    "about_beliefs": (
+        "🧩 *Проработка убеждений*\n\n"
+        "7-дневный курс для работы с тем что мешает — в деньгах, отношениях, самооценке, реализации, страхах.\n\n"
+        "Каждый день новый шаг: найти блок → познакомиться с субличностью → переписать убеждение → закрепить.\n\n"
+        f"Стоимость: *10 000 ₸* или входит в подписку на 6 месяцев 🎁"
+    ),
+}
+
+
+@router.callback_query(F.data.startswith("about_"))
+async def show_section_info(callback: CallbackQuery):
+    key = callback.data
+    text = SECTION_INFO.get(key, "")
+
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="◀️ Назад к разделам", callback_data="back_to_sections"))
+
+    await callback.message.edit_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "back_to_sections")
+async def back_to_sections(callback: CallbackQuery):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧠 Психолог", callback_data="about_psychologist"))
+    builder.row(InlineKeyboardButton(text="🔮 И-Цзин", callback_data="about_iching"))
+    builder.row(InlineKeyboardButton(text="🃏 МАК-карты", callback_data="about_mak"))
+    builder.row(InlineKeyboardButton(text="🔢 Нумерология", callback_data="about_numerology"))
+    builder.row(InlineKeyboardButton(text="🧘 Медитации", callback_data="about_meditation"))
+    builder.row(InlineKeyboardButton(text="🧩 Проработка убеждений", callback_data="about_beliefs"))
+    builder.row(InlineKeyboardButton(text="✨ Всё понятно, начнём!", callback_data="onboarding_done"))
+
+    await callback.message.edit_text(
+        "Нажми на любой раздел чтобы узнать подробнее 👇\n\nКогда будешь готова — нажми *Начнём!*",
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup()
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "onboarding_done")
+async def onboarding_finish(callback: CallbackQuery):
+    user = await get_user(callback.from_user.id)
+    name = user.get("user_name_custom") or user.get("first_name") or "дорогая"
+    await callback.message.edit_text(
+        f"Отлично, *{name}* 🌸\n\n"
+        f"кстати, тест *Образ денег* — бесплатно 🎁 "
+        f"многие говорят что за 5 минут увидели то что годами не могли понять про себя. попробуй 👇",
         parse_mode="Markdown",
         reply_markup=main_menu()
     )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "show_updates")
+async def show_updates(callback: CallbackQuery):
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🧩 Узнать про курс убеждений", callback_data="about_beliefs"))
+    builder.row(InlineKeyboardButton(text="🏠 В главное меню", callback_data="back_menu"))
+
+    await callback.message.edit_text(
+        "🌸 *Что появилось у Мирры*\n\n"
+        "🧩 *Проработка убеждений* — 7-дневный курс где ты:\n"
+        "• выявишь главный блок в нужной сфере\n"
+        "• познакомишься с субличностью за ним\n"
+        "• перепишешь убеждение на новое\n"
+        "• закрепишь через практику и реальный шаг\n\n"
+        "Сферы: деньги, отношения, самооценка, самореализация, страхи\n\n"
+        "Стоимость: *10 000 ₸* или бесплатно при подписке на 6 месяцев 🎁\n\n"
+        "Хочешь узнать подробнее? 👇",
+        parse_mode="Markdown",
+        reply_markup=builder.as_markup()
+    )
+    await callback.answer()
 
 
 @router.callback_query(F.data == "back_menu")
