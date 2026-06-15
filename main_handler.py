@@ -23,6 +23,7 @@ from services.ai_service import (
     generate_session_summary
 )
 from handlers.tests_handler import handle_test_answer, handle_auditing
+from services.voice_service import transcribe_voice, download_voice, cleanup_file
 from utils.keyboards import (
     main_menu, iching_intro, iching_confirm, mak_intro, mak_draw,
     mak_after_card, numerology_menu, numerology_other, meditation_menu,
@@ -150,11 +151,24 @@ MEDITATION_YOUTUBE = {
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
+    # Проверяем реф-код
+    args = message.text.split()
+    ref_code = args[1] if len(args) > 1 and args[1].startswith("ref_") else None
+
     user = await get_or_create_user(
         telegram_id=message.from_user.id,
         username=message.from_user.username,
         first_name=message.from_user.first_name
     )
+
+    # Сохраняем реф если пришёл по ссылке впервые
+    if ref_code and not user.get("ref_code"):
+        from models.database import get_ref_code, save_ref_conversion
+        ref = await get_ref_code(ref_code)
+        if ref:
+            await save_ref_conversion(message.from_user.id, ref_code)
+            logger.info(f"Реферал {message.from_user.id} от {ref_code}")
+
     await set_user_mode(message.from_user.id, "menu")
     await clear_context(message.from_user.id)
 
@@ -162,7 +176,9 @@ async def cmd_start(message: Message):
     if user.get("onboarding_done"):
         name = user.get("user_name_custom") or user.get("first_name") or "дорогая"
         await message.answer(
-            f"С возвращением, {name}! 🌙\n\nЧто сделаем сегодня?",
+            f"С возвращением, {name}! 🌙\n\nЧто сделаем сегодня?\n\n"
+            f"кстати, напоминаю — тест *Образ денег* бесплатный 🎁 если ещё не пробовала — очень советую 😊",
+            parse_mode="Markdown",
             reply_markup=main_menu()
         )
         return
@@ -226,7 +242,8 @@ async def finish_onboarding(message: Message, name: str):
         f"📌 *Важно про дневник*\n\n"
         f"Все записи хранятся *30 дней*. 1-го числа каждого месяца "
         f"я пришлю тебе красивый PDF со всем что было 💜\n\n"
-        f"Что сделаем сегодня?",
+        f"Что сделаем сегодня?\n\n"
+        f"кстати, тест *Образ денег* — бесплатно 🎁 многие говорят что за 5 минут увидели то что годами не могли понять про себя. попробуй 👇",
         parse_mode="Markdown",
         reply_markup=main_menu()
     )
@@ -1100,6 +1117,10 @@ async def handle_message(message: Message):
     elif mode == "auditing":
         await increment_message_count(user_id)
         await handle_auditing(message, text)
+
+    elif mode.startswith("beliefs_day_"):
+        from handlers.beliefs_handler import handle_beliefs_message
+        await handle_beliefs_message(message, mode)
 
     else:
         # Любой текст в режиме меню — показываем меню

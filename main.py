@@ -12,6 +12,7 @@ from handlers.main_handler import router
 from handlers.payment_handler import router as payment_router
 from handlers.tests_handler import router as tests_router
 from handlers.referral_handler import router as referral_router
+from handlers.beliefs_handler import router as beliefs_router, init_beliefs_tables
 from services.scheduler import setup_scheduler
 
 load_dotenv()
@@ -36,6 +37,8 @@ async def main():
     await init_db()
     from models.database import init_referral_tables
     await init_referral_tables()
+    await init_beliefs_tables()
+    await init_referral_tables()
 
     # Создаём бота и диспетчер
     bot = Bot(
@@ -43,6 +46,7 @@ async def main():
         default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)
     )
     dp = Dispatcher()
+    dp.include_router(beliefs_router)
     dp.include_router(payment_router)
     dp.include_router(referral_router)
     dp.include_router(tests_router)
