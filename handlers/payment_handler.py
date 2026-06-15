@@ -224,6 +224,7 @@ async def cmd_admin(message: Message):
         "✅ Тебе открыт безлимитный доступ навсегда\n\n"
         "*Команды:*\n"
         "`/give_access [user_id]` — дать подписку на 30 дней\n"
+        "`/give_beliefs @username` — дать доступ к курсу убеждений\n"
         "`/revoke_access [user_id]` — забрать подписку\n"
         "`/stats` — статистика пользователей\n"
         "`/broadcast [текст]` — рассылка всем пользователям",
@@ -306,6 +307,70 @@ async def cmd_give_access(message: Message):
 
     except ValueError:
         await message.answer("❌ Неверный формат. Используй @username или числовой ID")
+
+
+@router.message(Command("give_beliefs"))
+async def cmd_give_beliefs(message: Message):
+    if not is_admin(message.from_user.id):
+        return
+
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer(
+            "Использование:\n"
+            "`/give_beliefs @username` — открыть доступ к курсу убеждений",
+            parse_mode="Markdown"
+        )
+        return
+
+    target = parts[1].replace("@", "")
+
+    try:
+        if target.isdigit():
+            target_id = int(target)
+            name = target
+        else:
+            from models.database import _init_pool
+            import psycopg2.extras
+            p = _init_pool()
+            conn = p.getconn()
+            try:
+                with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                    cur.execute(
+                        "SELECT telegram_id, first_name FROM users WHERE LOWER(username) = LOWER(%s)",
+                        (target,)
+                    )
+                    user = cur.fetchone()
+            finally:
+                p.putconn(conn)
+
+            if not user:
+                await message.answer(
+                    f"❌ Пользователь @{target} не найден.\n\nОн должен сначала запустить бота (/start).",
+                    parse_mode="Markdown"
+                )
+                return
+
+            target_id = user["telegram_id"]
+            name = user.get("first_name", target)
+            await message.answer(f"✅ Нашла: {name} (ID: {target_id})")
+
+        await update_user(target_id, beliefs_access=1)
+
+        try:
+            await message.bot.send_message(
+                chat_id=target_id,
+                text="🧩 *Доступ к курсу «Проработка убеждений» открыт!*\n\n"
+                     "Заходи в меню → Проработка убеждений и выбирай сферу 🌸",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось уведомить {target_id}: {e}")
+
+        await message.answer(f"✅ Доступ к курсу убеждений выдан: {name}")
+
+    except ValueError:
+        await message.answer("❌ Неверный формат")
 
 
 @router.message(Command("revoke_access"))
