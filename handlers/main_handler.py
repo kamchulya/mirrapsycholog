@@ -51,6 +51,15 @@ def main_menu() -> _IKM:
 router = Router()
 logger = logging.getLogger(__name__)
 
+async def safe_edit_text(message, text, **kwargs):
+    """Безопасный edit_text — игнорирует ошибку 'message is not modified'"""
+    try:
+        await message.edit_text(text, **kwargs)
+    except Exception as e:
+        if "message is not modified" not in str(e):
+            raise
+
+
 
 def safe_text(text: str) -> str:
     """Очищаем текст от проблемных Markdown символов для Telegram"""
@@ -321,7 +330,7 @@ async def show_section_info(callback: CallbackQuery):
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="◀️ Назад к разделам", callback_data="back_to_sections"))
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         text,
         parse_mode="Markdown",
         reply_markup=builder.as_markup()
@@ -343,7 +352,7 @@ async def back_to_sections(callback: CallbackQuery):
     builder.row(InlineKeyboardButton(text="🧩 Проработка убеждений", callback_data="about_beliefs"))
     builder.row(InlineKeyboardButton(text="✨ Всё понятно, начнём!", callback_data="onboarding_done"))
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "Нажми на любой раздел чтобы узнать подробнее 👇\n\nКогда будешь готова — нажми *Начнём!*",
         parse_mode="Markdown",
         reply_markup=builder.as_markup()
@@ -355,7 +364,7 @@ async def back_to_sections(callback: CallbackQuery):
 async def onboarding_finish(callback: CallbackQuery):
     user = await get_user(callback.from_user.id)
     name = user.get("user_name_custom") or user.get("first_name") or "дорогая"
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"Отлично, *{name}* 🌸\n\n"
         f"кстати, тест *Образ денег* — бесплатно 🎁 "
         f"многие говорят что за 5 минут увидели то что годами не могли понять про себя. попробуй 👇",
@@ -373,7 +382,7 @@ async def show_updates(callback: CallbackQuery):
     builder.row(InlineKeyboardButton(text="🧩 Узнать про курс убеждений", callback_data="about_beliefs"))
     builder.row(InlineKeyboardButton(text="🏠 В главное меню", callback_data="back_menu"))
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🌸 *Что появилось у Мирры*\n\n"
         "🧩 *Проработка убеждений* — 7-дневный курс где ты:\n"
         "• выявишь главный блок в нужной сфере\n"
@@ -393,7 +402,7 @@ async def show_updates(callback: CallbackQuery):
 async def back_to_main_menu(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "menu")
     await clear_context(callback.from_user.id)
-    await callback.message.edit_text("Главное меню 🏠\n\nЧто сделаем сегодня?", reply_markup=main_menu())
+    await safe_edit_text(callback.message, "Главное меню 🏠\n\nЧто сделаем сегодня?", reply_markup=main_menu())
     await callback.answer()
 
 
@@ -405,7 +414,7 @@ async def back_to_main_menu(callback: CallbackQuery):
 async def start_psychologist(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "psychologist")
     await clear_context(callback.from_user.id)
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🧠 *Режим: Психолог*\n\n"
         "Я здесь, чтобы быть рядом с тобой в этот момент.\n\n"
         "События в жизни происходят вне зависимости от нашего желания "
@@ -429,7 +438,7 @@ async def start_psychologist(callback: CallbackQuery):
 @router.callback_query(F.data == "mode_iching")
 async def start_iching_intro(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "menu")
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🔮 *Гадание И-Цзин*\n\n"
         "Книга Перемен — древнейший памятник китайской мысли (более 3000 лет). "
         "Это одновременно философский трактат и система предсказания.\n\n"
@@ -453,7 +462,7 @@ async def start_iching_intro(callback: CallbackQuery):
 @router.callback_query(F.data == "iching_start")
 async def iching_ask_question(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "iching_question")
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🔮 Напиши свой вопрос к Книге Перемен 👇\n\n"
         "_Помни: открытый вопрос даёт глубокий ответ_",
         parse_mode="Markdown",
@@ -472,7 +481,7 @@ async def throw_iching(callback: CallbackQuery):
             user_question = msg.get("content", "")
             break
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🪙 *Бросаю монеты...*\n\n_Думай о своём вопросе..._",
         parse_mode="Markdown"
     )
@@ -497,7 +506,7 @@ async def throw_iching(callback: CallbackQuery):
 
 @router.callback_query(F.data == "mode_mak")
 async def start_mak_intro(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🃏 *МАК-карты — работа с подсознанием*\n\n"
         "МАК (Метафорические Ассоциативные Карты) — это инструмент психологов "
         "и коучей для работы с подсознанием. Это не гадание и не магия.\n\n"
@@ -524,7 +533,7 @@ async def start_mak_intro(callback: CallbackQuery):
 @router.callback_query(F.data == "mak_go")
 async def mak_ask_question(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "mak_question")
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🃏 Сформулируй свой вопрос или ситуацию.\n\n"
         "Например: _«Что мешает мне двигаться вперёд?»_ "
         "или _«Как мне улучшить отношения с...?»_\n\n"
@@ -570,7 +579,7 @@ async def draw_mak_card(callback: CallbackQuery):
             )
         else:
             # Картинка не загружена — отправляем текстом с инструкцией
-            await callback.message.edit_text(
+            await safe_edit_text(callback.message, 
                 f"🃏 *Твоя карта:*\n\n"
                 f"*{card_name}*\n\n"
                 f"_(Представь этот образ перед собой — "
@@ -581,7 +590,7 @@ async def draw_mak_card(callback: CallbackQuery):
             )
     except Exception as e:
         logger.error(f"Ошибка отправки карты: {e}")
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             f"🃏 *Твоя карта: {card_name}*\n\n"
             f"Посмотри на этот образ...\n\n"
             f"Готова рассказать что чувствуешь? 👇",
@@ -620,7 +629,7 @@ async def mak_start_dialog(callback: CallbackQuery):
 @router.callback_query(F.data == "mode_numerology")
 async def start_numerology(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "numerology_date")
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🔢 *Нумерология*\n\n"
         "Числа рассказывают о твоей природе, талантах и жизненных задачах.\n\n"
         "Напиши свою *дату рождения* в формате ДД.ММ.ГГГГ\n"
@@ -686,7 +695,7 @@ async def numerology_extra(callback: CallbackQuery):
 
 @router.callback_query(F.data == "num_back")
 async def num_back(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🔢 Что ещё рассчитаем?",
         reply_markup=numerology_menu()
     )
@@ -713,7 +722,7 @@ def _get_num_data_from_context(ctx: list) -> tuple:
 @router.callback_query(F.data == "mode_meditation")
 async def start_meditation(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "meditation")
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "🧘 *Медитации и визуализации*\n\n"
         "Выбери практику под своё состояние прямо сейчас:",
         parse_mode="Markdown",
@@ -729,7 +738,7 @@ async def run_meditation(callback: CallbackQuery):
         await callback.answer("Неизвестная медитация")
         return
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"🧘 *{med_data['name']}*\n\n_Подготавливаю практику..._",
         parse_mode="Markdown"
     )
@@ -743,7 +752,7 @@ async def run_meditation(callback: CallbackQuery):
         bot_response=response
     )
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"🧘 *{med_data['name']}*\n\n{safe_text(response)}",
         parse_mode="Markdown"
     )
@@ -776,7 +785,7 @@ async def open_diary(callback: CallbackQuery):
             break
 
     if last_topic:
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             f"📖 *Мой дневник*\n\n"
             f"Кстати, недавно ты говорила о:\n"
             f"_«{last_topic}...»_\n\n"
@@ -786,7 +795,7 @@ async def open_diary(callback: CallbackQuery):
             reply_markup=diary_followup()
         )
     else:
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             "📖 *Мой дневник*\n\nЗдесь хранится всё, о чём мы говорили.\nMirra помнит тебя 💜",
             parse_mode="Markdown",
             reply_markup=diary_menu()
@@ -808,7 +817,7 @@ async def diary_followup_start(callback: CallbackQuery):
         {"role": "system", "content": f"topic:{last_topic}"}
     ])
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"💬 Расскажи — как в итоге разрешилась ситуация?\n\n"
         f"_Мне интересно всё — и что случилось, и как ты себя чувствуешь сейчас._",
         parse_mode="Markdown",
@@ -822,7 +831,7 @@ async def diary_write_start(callback: CallbackQuery):
     await set_user_mode(callback.from_user.id, "diary_dialog")
     await clear_context(callback.from_user.id)
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "📝 *Записываем твой день*\n\n"
         "Что сегодня было самым важным для тебя?\n\n"
         "_Можешь написать всё что угодно — я здесь._",
@@ -844,7 +853,7 @@ async def diary_save(callback: CallbackQuery):
             entry_type="day",
             content=summary
         )
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             f"✅ *Сохранено в дневник!*\n\n_{summary}_\n\n"
             f"Хорошего вечера 💜",
             parse_mode="Markdown",
@@ -857,7 +866,7 @@ async def diary_save(callback: CallbackQuery):
 
 @router.callback_query(F.data == "diary_add_more")
 async def diary_add_more(callback: CallbackQuery):
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         "Продолжай — я слушаю 💜",
         reply_markup=back_to_menu()
     )
@@ -866,7 +875,7 @@ async def diary_add_more(callback: CallbackQuery):
 
 @router.callback_query(F.data == "diary_mood")
 async def ask_mood(callback: CallbackQuery):
-    await callback.message.edit_text("😊 Как ты сейчас?", reply_markup=mood_keyboard())
+    await safe_edit_text(callback.message, "😊 Как ты сейчас?", reply_markup=mood_keyboard())
     await callback.answer()
 
 
@@ -913,7 +922,7 @@ async def save_mood(callback: CallbackQuery):
                 text="Позже",
                 callback_data="back_menu"
             ))
-            await callback.message.edit_text(
+            await safe_edit_text(callback.message, 
                 f"Записала: *{mood}*\n\n{text}\n\n"
                 f"━━━━━━━━━━━━━━━━━\n"
                 f"📖 Ты уже записала *{mood_count} эмоций* этого месяца!\n\n"
@@ -926,7 +935,7 @@ async def save_mood(callback: CallbackQuery):
             await callback.answer()
             return
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"Записала: *{mood}*\n\n{text}",
         parse_mode="Markdown",
         reply_markup=main_menu()
@@ -938,7 +947,7 @@ async def save_mood(callback: CallbackQuery):
 async def show_week_entries(callback: CallbackQuery):
     dialogs = await get_week_dialogs(callback.from_user.id)
     if not dialogs:
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             "📖 За эту неделю у нас ещё не было диалогов.\n\nДавай начнём? 💜",
             reply_markup=main_menu()
         )
@@ -956,18 +965,18 @@ async def show_week_entries(callback: CallbackQuery):
         preview = d['user_message'][:70] + ("..." if len(d['user_message']) > 70 else "")
         text += f"*{date}* {icon}\n_{preview}_\n\n"
 
-    await callback.message.edit_text(text, parse_mode="Markdown", reply_markup=diary_menu())
+    await safe_edit_text(callback.message, text, parse_mode="Markdown", reply_markup=diary_menu())
     await callback.answer()
 
 
 @router.callback_query(F.data == "diary_report")
 async def generate_report(callback: CallbackQuery):
-    await callback.message.edit_text("📊 _Составляю твой отчёт за неделю..._", parse_mode="Markdown")
+    await safe_edit_text(callback.message, "📊 _Составляю твой отчёт за неделю..._", parse_mode="Markdown")
     dialogs = await get_week_dialogs(callback.from_user.id)
     user = await get_user(callback.from_user.id)
     name = user.get("first_name", "") if user else ""
     report = await generate_weekly_report(dialogs, name)
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"📊 *Твоя неделя в Mirra*\n\n{report}",
         parse_mode="Markdown",
         reply_markup=diary_menu()

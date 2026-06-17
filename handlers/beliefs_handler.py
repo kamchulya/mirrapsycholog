@@ -15,6 +15,15 @@ from models.database import (
 
 logger = logging.getLogger(__name__)
 router = Router()
+
+async def safe_edit_text(message, text, **kwargs):
+    """Безопасный edit_text — игнорирует ошибку 'message is not modified'"""
+    try:
+        await message.edit_text(text, **kwargs)
+    except Exception as e:
+        if "message is not modified" not in str(e):
+            raise
+
 client = AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 # ──────────────────────────────────────────────
@@ -415,7 +424,7 @@ async def beliefs_menu(callback: CallbackQuery):
     active_course = await get_active_course(user_id)
 
     if not has_access:
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             "🧠 *Проработка убеждений*\n\n"
             "7-дневный курс где ты:\n"
             "• выявишь главный блок в нужной сфере\n"
@@ -431,7 +440,7 @@ async def beliefs_menu(callback: CallbackQuery):
     elif active_course:
         day = active_course["current_day"]
         sphere_name = SPHERES.get(active_course["sphere"], "")
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             f"🧠 *Проработка убеждений*\n\n"
             f"У тебя активный курс: {sphere_name}\n"
             f"День {day} из {COURSE_DAYS}\n\n"
@@ -440,7 +449,7 @@ async def beliefs_menu(callback: CallbackQuery):
             reply_markup=continue_course_keyboard()
         )
     else:
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             "🧠 *Проработка убеждений*\n\n"
             "Выбери сферу для 7-дневного курса 👇\n\n"
             "Каждый день — новый шаг глубже. Бот будет вести тебя сам.",
@@ -463,7 +472,7 @@ async def select_sphere(callback: CallbackQuery):
         "fears": "Выявим главный страх, найдём его корень и освободимся от его власти.",
     }
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"{sphere_name}\n\n"
         f"{descriptions.get(sphere, '')}\n\n"
         f"Курс — 7 дней. Каждый день новая практика.\n"
@@ -485,7 +494,7 @@ async def start_course(callback: CallbackQuery):
     name = user.get("user_name_custom") or user.get("first_name") or "дорогая"
     sphere_name = SPHERES.get(sphere, "")
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"🌱 Начинаем курс *{sphere_name}*\n\nДень 1 из 7 — Диагностика\n\n_пишу тебе..._",
         parse_mode="Markdown"
     )
@@ -496,7 +505,7 @@ async def start_course(callback: CallbackQuery):
     context = [{"role": "assistant", "content": response}]
     await save_beliefs_context(user_id, context)
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"🌱 *День 1 из 7 — Диагностика*\n\n{response}",
         parse_mode="Markdown"
     )
@@ -508,7 +517,7 @@ async def continue_course(callback: CallbackQuery):
     user_id = callback.from_user.id
     course = await get_active_course(user_id)
     if not course:
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             "Активного курса нет. Начни новый 👇",
             reply_markup=spheres_keyboard()
         )
@@ -519,7 +528,7 @@ async def continue_course(callback: CallbackQuery):
     await set_user_mode(user_id, f"beliefs_day_{day}")
     sphere_name = SPHERES.get(course["sphere"], "")
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"*День {day} из {COURSE_DAYS}* — {sphere_name}\n\n"
         f"Продолжаем 🌱\n\nЧто хочешь написать?",
         parse_mode="Markdown"
@@ -541,7 +550,7 @@ async def next_day(callback: CallbackQuery):
     if next_day_num > COURSE_DAYS:
         await update_course(user_id, completed=1)
         await set_user_mode(user_id, "menu")
-        await callback.message.edit_text(
+        await safe_edit_text(callback.message, 
             "🎉 *Курс завершён!*\n\nТы прошла все 7 дней. Это большая работа.\n\n"
             "Хочешь начать курс по другой сфере?",
             parse_mode="Markdown",
@@ -582,7 +591,7 @@ async def next_day(callback: CallbackQuery):
         7: "Итоги и трекер"
     }
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"*День {next_day_num} из {COURSE_DAYS}* — {day_titles.get(next_day_num, '')}\n\n_пишу тебе..._",
         parse_mode="Markdown"
     )
@@ -591,7 +600,7 @@ async def next_day(callback: CallbackQuery):
     new_context = [{"role": "assistant", "content": response}]
     await save_beliefs_context(user_id, new_context)
 
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"*День {next_day_num} из {COURSE_DAYS}* — {day_titles.get(next_day_num, '')}\n\n{response}",
         parse_mode="Markdown"
     )
@@ -601,7 +610,7 @@ async def next_day(callback: CallbackQuery):
 @router.callback_query(F.data == "beliefs_buy")
 async def buy_beliefs(callback: CallbackQuery):
     kaspi_phone = os.getenv("KASPI_PHONE", "+7 XXX XXX XX XX")
-    await callback.message.edit_text(
+    await safe_edit_text(callback.message, 
         f"💳 *Оплата курса «Проработка убеждений»*\n\n"
         f"Стоимость: *{BELIEFS_COURSE_PRICE} ₸*\n\n"
         f"Переведи на Kaspi:\n*{kaspi_phone}*\n\n"
