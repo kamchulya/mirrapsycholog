@@ -108,19 +108,7 @@ async def main():
     dp.include_router(tests_router)
     dp.include_router(router)
     
-    # --- ВОТ СЮДА МЫ ДОБАВИЛИ ХЕНДЛЕР ОШИБОК ---
-    @dp.errors()
-    async def error_handler(event: ErrorEvent):
-        if isinstance(event.exception, TelegramBadRequest):
-            if "message is not modified" in event.exception.message:
-                logger.info("Мира пыталась обновить меню, но текст совпал. Ошибка 'message is not modified' успешно проигнорирована.")
-                return True # Возвращаем True, чтобы aiogram понял, что ошибка обработана
-        
-        # Если ошибка какая-то другая, логируем её на уровне ERROR
-        logger.error(f"Критическая ошибка при обработке апдейта: {event.exception}", exc_info=event.exception)
-    # ------------------------------------------
-
-    # Подключаем роутеры
+     # Подключаем роутеры
     dp.include_router(beliefs_router)
     dp.include_router(payment_router)
     dp.include_router(referral_router)
