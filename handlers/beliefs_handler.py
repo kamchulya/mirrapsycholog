@@ -197,6 +197,11 @@ async def get_active_course(user_id: int):
 
 async def create_course(user_id: int, sphere: str):
     def _create():
+        # Завершаем все предыдущие незакрытые курсы перед началом нового
+        _execute(
+            "UPDATE beliefs_course SET completed = 1 WHERE user_id = %s AND completed = 0",
+            (user_id,)
+        )
         _execute(
             "INSERT INTO beliefs_course (user_id, sphere, current_day) VALUES (%s, %s, 1)",
             (user_id, sphere)
@@ -240,6 +245,17 @@ async def get_beliefs_context(user_id: int) -> list:
     return await _run(_get)
 
 
+async def get_completed_spheres(user_id: int) -> list:
+    """Список сфер которые пользователь уже прошёл полностью (один раз каждая)"""
+    def _get():
+        rows = _execute(
+            "SELECT DISTINCT sphere FROM beliefs_course WHERE user_id = %s AND completed = 1",
+            (user_id,), fetch="all"
+        )
+        return [r["sphere"] for r in rows] if rows else []
+    return await _run(_get)
+
+
 async def has_beliefs_access(user_id: int) -> bool:
     """Проверяем доступ: куплен курс ИЛИ подписка 6+ месяцев"""
     user = await get_user(user_id)
@@ -264,13 +280,20 @@ async def has_beliefs_access(user_id: int) -> bool:
 # КЛАВИАТУРЫ
 # ──────────────────────────────────────────────
 
-def spheres_keyboard() -> InlineKeyboardMarkup:
+def spheres_keyboard(completed: list = None) -> InlineKeyboardMarkup:
+    completed = completed or []
     builder = InlineKeyboardBuilder()
     for key, name in SPHERES.items():
-        builder.row(InlineKeyboardButton(
-            text=name,
-            callback_data=f"beliefs_sphere_{key}"
-        ))
+        if key in completed:
+            builder.row(InlineKeyboardButton(
+                text=f"✅ {name} (пройдено)",
+                callback_data=f"beliefs_already_done_{key}"
+            ))
+        else:
+            builder.row(InlineKeyboardButton(
+                text=name,
+                callback_data=f"beliefs_sphere_{key}"
+            ))
     builder.row(InlineKeyboardButton(text="◀️ Назад", callback_data="main_menu"))
     return builder.as_markup()
 
@@ -313,7 +336,7 @@ def continue_course_keyboard() -> InlineKeyboardMarkup:
     ))
     builder.row(InlineKeyboardButton(
         text="🔄 Начать новую сферу",
-        callback_data="beliefs_menu"
+        callback_data="beliefs_new_sphere"
     ))
     builder.row(InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu"))
     return builder.as_markup()
@@ -417,6 +440,44 @@ async def extract_new_belief(context: list) -> str:
 # ХЭНДЛЕРЫ
 # ──────────────────────────────────────────────
 
+@router.callback_query(F.data == "beliefs_new_sphere")
+async def beliefs_new_sphere(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    completed = await get_completed_spheres(user_id)
+
+    if len(completed) >= len(SPHERES):
+        await safe_edit_text(
+            callback.message,
+            "🌸 *Ты прошла все сферы курса!*\n\n"
+            "Деньги, отношения, самореализация, самооценка, страхи — везде уже была проделана работа. "
+            "Это большой путь, ты молодец.\n\n"
+            "Если хочешь углубиться в какую-то сферу ещё раз — это будет уже новая покупка курса.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu")
+            ]])
+        )
+        await callback.answer()
+        return
+
+    await safe_edit_text(
+        callback.message,
+        "🧠 *Проработка убеждений*\n\n"
+        "Выбери сферу для 7-дневного курса 👇\n\n"
+        "Каждый день — новый шаг глубже. Бот будет вести тебя сам.",
+        parse_mode="Markdown",
+        reply_markup=spheres_keyboard(completed)
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("beliefs_already_done_"))
+async def beliefs_already_done(callback: CallbackQuery):
+    sphere = callback.data.replace("beliefs_already_done_", "")
+    sphere_name = SPHERES.get(sphere, "")
+    await callback.answer(f"Эта сфера уже пройдена ({sphere_name}) 🌸", show_alert=True)
+
+
 @router.callback_query(F.data == "beliefs_menu")
 async def beliefs_menu(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -449,12 +510,26 @@ async def beliefs_menu(callback: CallbackQuery):
             reply_markup=continue_course_keyboard()
         )
     else:
+        completed = await get_completed_spheres(user_id)
+        if len(completed) >= len(SPHERES):
+            await safe_edit_text(callback.message,
+                "🌸 *Ты прошла все сферы курса!*\n\n"
+                "Деньги, отношения, самореализация, самооценка, страхи — везде уже была проделана работа. "
+                "Это большой путь, ты молодец.\n\n"
+                "Если хочешь углубиться в какую-то сферу ещё раз — это будет уже новая покупка курса.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu")
+                ]])
+            )
+            await callback.answer()
+            return
         await safe_edit_text(callback.message, 
             "🧠 *Проработка убеждений*\n\n"
             "Выбери сферу для 7-дневного курса 👇\n\n"
             "Каждый день — новый шаг глубже. Бот будет вести тебя сам.",
             parse_mode="Markdown",
-            reply_markup=spheres_keyboard()
+            reply_markup=spheres_keyboard(completed)
         )
     await callback.answer()
 
@@ -463,6 +538,11 @@ async def beliefs_menu(callback: CallbackQuery):
 async def select_sphere(callback: CallbackQuery):
     sphere = callback.data.replace("beliefs_sphere_", "")
     sphere_name = SPHERES.get(sphere, "")
+
+    completed = await get_completed_spheres(callback.from_user.id)
+    if sphere in completed:
+        await callback.answer(f"Эта сфера уже пройдена ({sphere_name}) 🌸", show_alert=True)
+        return
 
     descriptions = {
         "money": "Разберём твои убеждения про деньги, достаток, заработок. Найдём что мешает и перепишем.",
@@ -486,6 +566,11 @@ async def select_sphere(callback: CallbackQuery):
 async def start_course(callback: CallbackQuery):
     sphere = callback.data.replace("beliefs_start_", "")
     user_id = callback.from_user.id
+
+    completed = await get_completed_spheres(user_id)
+    if sphere in completed:
+        await callback.answer("Эта сфера уже пройдена 🌸", show_alert=True)
+        return
 
     await create_course(user_id, sphere)
     await set_user_mode(user_id, f"beliefs_day_1")
@@ -550,12 +635,29 @@ async def next_day(callback: CallbackQuery):
     if next_day_num > COURSE_DAYS:
         await update_course(user_id, completed=1)
         await set_user_mode(user_id, "menu")
-        await safe_edit_text(callback.message, 
-            "🎉 *Курс завершён!*\n\nТы прошла все 7 дней. Это большая работа.\n\n"
-            "Хочешь начать курс по другой сфере?",
-            parse_mode="Markdown",
-            reply_markup=spheres_keyboard()
-        )
+        completed = await get_completed_spheres(user_id)
+
+        if len(completed) >= len(SPHERES):
+            await safe_edit_text(callback.message,
+                "🎉 *Курс завершён!*\n\nТы прошла все 7 дней. Это большая работа.\n\n"
+                "И это была последняя сфера — ты прошла весь путь по всем направлениям курса 🌸 "
+                "Невероятная работа над собой.\n\n"
+                "Если захочешь пройти какую-то сферу ещё раз и копнуть глубже — "
+                f"всегда можно купить курс снова за *{BELIEFS_COURSE_PRICE} ₸* 💫",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="💳 Купить курс снова", callback_data="beliefs_buy")
+                ], [
+                    InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu")
+                ]])
+            )
+        else:
+            await safe_edit_text(callback.message, 
+                "🎉 *Курс завершён!*\n\nТы прошла все 7 дней. Это большая работа.\n\n"
+                "Хочешь начать курс по другой сфере?",
+                parse_mode="Markdown",
+                reply_markup=spheres_keyboard(completed)
+            )
         await callback.answer()
         return
 
@@ -669,13 +771,30 @@ async def handle_beliefs_message(message: Message, mode: str):
     elif day == COURSE_DAYS and show_next:
         await update_course(user_id, completed=1)
         await set_user_mode(user_id, "menu")
-        await message.answer(
-            response + "\n\n🎉 *Курс завершён! Ты молодец.*",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="🔄 Новая сфера", callback_data="beliefs_menu"),
-                InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu")
-            ]])
-        )
+        completed = await get_completed_spheres(user_id)
+
+        if len(completed) >= len(SPHERES):
+            await message.answer(
+                response + "\n\n🎉 *Курс завершён! Ты молодец.*\n\n"
+                "И это была последняя сфера — ты прошла весь путь по всем направлениям курса 🌸 "
+                "Невероятная работа над собой.\n\n"
+                "Если захочешь пройти какую-то сферу ещё раз и копнуть глубже — "
+                f"всегда можно купить курс снова за *{BELIEFS_COURSE_PRICE} ₸* 💫",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="💳 Купить курс снова", callback_data="beliefs_buy")
+                ], [
+                    InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu")
+                ]])
+            )
+        else:
+            await message.answer(
+                response + "\n\n🎉 *Курс завершён! Ты молодец.*",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="🔄 Новая сфера", callback_data="beliefs_menu"),
+                    InlineKeyboardButton(text="🏠 Меню", callback_data="main_menu")
+                ]])
+            )
     else:
         await message.answer(response)
