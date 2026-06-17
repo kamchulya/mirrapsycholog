@@ -107,13 +107,6 @@ async def main():
     dp.include_router(referral_router)
     dp.include_router(tests_router)
     dp.include_router(router)
-    
-     # Подключаем роутеры
-    dp.include_router(beliefs_router)
-    dp.include_router(payment_router)
-    dp.include_router(referral_router)
-    dp.include_router(tests_router)
-    dp.include_router(router)
     # Запускаем планировщик
     scheduler = setup_scheduler(bot)
     scheduler.start()
