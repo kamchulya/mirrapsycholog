@@ -377,7 +377,7 @@ async def generate_day_response(day: int, course: dict, user_name: str, history:
         messages = messages + [{"role": "user", "content": user_message}]
 
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=1000,
         system=system,
         messages=messages if messages else [{"role": "user", "content": "начнём"}]
@@ -392,7 +392,7 @@ async def extract_belief_from_context(context: list, sphere_name: str) -> str:
         for m in context[-15:]
     ])
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=100,
         messages=[{
             "role": "user",
@@ -409,7 +409,7 @@ async def extract_subpersonality(context: list) -> str:
         for m in context[-15:]
     ])
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=100,
         messages=[{
             "role": "user",
@@ -426,7 +426,7 @@ async def extract_new_belief(context: list) -> str:
         for m in context[-15:]
     ])
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=100,
         messages=[{
             "role": "user",
