@@ -2,7 +2,7 @@ import os
 import anthropic
 
 client = anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-haiku-4-5-20251001"
 
 # ──────────────────────────────────────────────
 # СИСТЕМНЫЕ ПРОМПТЫ
